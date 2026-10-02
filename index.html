@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ROLL ♡ — Leave It to Chance</title>
+  <meta name="description" content="A beautiful ruby-red heart dice roller. Leave it to chance." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Inter:wght@300;400;500&display=swap"
+    rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --ruby: #C0152A;
+      --ruby-deep: #8B0011;
+      --ivory: #FAF7F2;
+      --dark-red: #6B000E;
+      --white: #FFFFFF;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--ivory);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      position: relative;
+      user-select: none;
+    }
+
+    /* Grain texture */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Warm radial glow */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(ellipse 72% 62% at 50% 42%, rgba(248, 222, 212, 0.38) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .page {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      padding: 20px;
+      height: 100vh;
+      gap: 0;
+    }
+
+    /* ── HEADER ── */
+    .header {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    .title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(2.6rem, 6vw, 4.4rem);
+      font-weight: 300;
+      letter-spacing: 0.3em;
+      color: var(--dark-red);
+      line-height: 1;
+      text-transform: uppercase;
+    }
+
+    .subtitle {
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-size: clamp(0.82rem, 1.8vw, 1.02rem);
+      font-weight: 300;
+      color: var(--ruby);
+      letter-spacing: 0.2em;
+      margin-top: 7px;
+      opacity: 0.7;
+    }
+
+    /* ── DICE ── */
+    .dice-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 10px 0;
+      cursor: pointer;
+    }
+
+    #dice-canvas {
+      display: block;
+    }
+
+    .dice-shadow {
+      position: absolute;
+      bottom: -8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 165px;
+      height: 24px;
+      background: radial-gradient(ellipse, rgba(170, 8, 26, 0.28) 0%, transparent 72%);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    /* ── RESULT ── */
+    .result-area {
+      height: 74px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin: 4px 0 10px;
+      gap: 4px;
+    }
+
+    .result-hearts {
+      font-size: 1.12rem;
+      letter-spacing: 0.26em;
+      color: var(--ruby);
+      min-height: 1.5em;
+      filter: drop-shadow(0 0 5px rgba(192, 21, 42, 0.32));
+    }
+
+    .result-text {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(0.78rem, 1.6vw, 0.93rem);
+      letter-spacing: 0.32em;
+      color: var(--dark-red);
+      text-transform: uppercase;
+      opacity: 0;
+      transform: translateY(10px) scale(0.94);
+      transition: opacity 0.55s cubic-bezier(0.34, 1.56, 0.64, 1),
+        transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .result-text .num {
+      font-size: 1.95em;
+      font-weight: 500;
+      color: var(--ruby);
+      line-height: 1;
+      display: inline-block;
+      vertical-align: middle;
+    }
+
+    .result-text.visible {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+
+    /* ── BUTTON ── */
+    .roll-btn {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(0.78rem, 1.6vw, 0.93rem);
+      font-weight: 500;
+      letter-spacing: 0.38em;
+      text-transform: uppercase;
+      color: var(--dark-red);
+      background: var(--white);
+      border: 1px solid rgba(192, 21, 42, 0.38);
+      border-radius: 2px;
+      padding: 13px 44px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: color 0.35s, border-color 0.35s, transform 0.15s, box-shadow 0.35s;
+    }
+
+    .roll-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--ruby);
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 0;
+    }
+
+    .roll-btn:hover::before {
+      transform: scaleX(1);
+    }
+
+    .roll-btn:hover {
+      color: var(--white);
+      border-color: var(--ruby);
+      box-shadow: 0 4px 22px rgba(192, 21, 42, 0.22);
+    }
+
+    .roll-btn:active {
+      transform: scale(0.97);
+    }
+
+    .roll-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    .roll-btn span {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── SOUND BUTTON ── */
+    .sound-btn {
+      position: fixed;
+      bottom: 22px;
+      right: 22px;
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      border: 1px solid rgba(192, 21, 42, 0.22);
+      background: rgba(250, 247, 242, 0.9);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.25s, border-color 0.25s, transform 0.2s;
+      z-index: 100;
+      color: var(--ruby);
+    }
+
+    .sound-btn:hover {
+      background: rgba(192, 21, 42, 0.07);
+      border-color: var(--ruby);
+      transform: scale(1.08);
+    }
+
+    .sound-btn svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    /* ── CONFETTI ── */
+    .heart-confetti {
+      position: fixed;
+      pointer-events: none;
+      z-index: 200;
+      animation: confetti-fall 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+    }
+
+    @keyframes confetti-fall {
+      0% {
+        opacity: 1;
+        transform: translate(0, 0) rotate(0deg) scale(1);
+      }
+
+      100% {
+        opacity: 0;
+        transform: translate(var(--tx), var(--ty)) rotate(var(--rot)) scale(0.25);
+      }
+    }
+
+    /* ── GLOW ON LAND ── */
+    @keyframes glow-pulse {
+      0% {
+        filter: drop-shadow(0 0 0px rgba(192, 21, 42, 0));
+      }
+
+      40% {
+        filter: drop-shadow(0 0 30px rgba(192, 21, 42, 0.52));
+      }
+
+      100% {
+        filter: drop-shadow(0 0 0px rgba(192, 21, 42, 0));
+      }
+    }
+
+    .dice-wrapper.landed {
+      animation: glow-pulse 1.0s ease forwards;
+    }
+
+    /* ── KB HINT ── */
+    .kb-hint {
+      position: fixed;
+      bottom: 22px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.62rem;
+      letter-spacing: 0.22em;
+      color: rgba(107, 0, 14, 0.28);
+      text-transform: uppercase;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 480px) {
+      .kb-hint {
+        display: none;
+      }
+
+      .dice-shadow {
+        width: 115px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="page">
+    <header class="header">
+      <h1 class="title">ROLL ♡</h1>
+      <p class="subtitle">leave it to chance.</p>
+    </header>
+
+    <div class="dice-wrapper" id="diceWrapper">
+      <canvas id="dice-canvas"></canvas>
+      <div class="dice-shadow"></div>
+    </div>
+
+    <div class="result-area">
+      <div class="result-hearts" id="resultHearts"></div>
+      <div class="result-text" id="resultText"></div>
+    </div>
+
+    <button class="roll-btn" id="rollBtn" aria-label="Roll the dice">
+      <span>Roll the Dice</span>
+    </button>
+  </div>
+
+  <!-- Sound Toggle -->
+  <button class="sound-btn" id="soundBtn" aria-label="Toggle sound">
+    <svg id="soundIconOn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+      stroke-linecap="round" stroke-linejoin="round">
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+      <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+      <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+    </svg>
+    <svg id="soundIconOff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+      stroke-linecap="round" stroke-linejoin="round" style="display:none">
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+      <line x1="23" y1="9" x2="17" y2="15"></line>
+      <line x1="17" y1="9" x2="23" y2="15"></line>
+    </svg>
+  </button>
+
+  <div class="kb-hint">○ press space to roll</div>
+
+  <script>
+    // ══════════════════════════════════════════
+    //  WEB AUDIO — Synthesized dice sounds
+    // ══════════════════════════════════════════
+    let audioCtx = null;
+    let soundEnabled = true;
+    let audioUnlocked = false;
+
+    function getCtx() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      return audioCtx;
+    }
+
+    function unlockAudio() {
+      if (audioUnlocked) return;
+      const c = getCtx();
+      if (c.state === 'suspended') c.resume();
+      audioUnlocked = true;
+    }
+
+    function playRollingSound() {
+      if (!soundEnabled) return;
+      const ctx = getCtx();
+      const n = 22, dur = 1.45;
+      for (let i = 0; i < n; i++) {
+        const delay = (i / n) * dur * (0.45 + Math.random() * 0.55);
+        const t = ctx.currentTime + delay;
+        const len = Math.floor(ctx.sampleRate * 0.032);
+        const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let j = 0; j < len; j++)
+          d[j] = (Math.random() * 2 - 1) * Math.exp(-j / (ctx.sampleRate * 0.006));
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        const gain = ctx.createGain();
+        const vol = Math.max(0.06, (1 - i / n) * 0.42);
+        gain.gain.setValueAtTime(vol, t);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.032);
+        const filt = ctx.createBiquadFilter();
+        filt.type = 'bandpass';
+        filt.frequency.value = 600 + Math.random() * 1600;
+        filt.Q.value = 1.8;
+        src.connect(filt); filt.connect(gain); gain.connect(ctx.destination);
+        src.start(t);
+      }
+    }
+
+    function playLandSound() {
+      if (!soundEnabled) return;
+      const ctx = getCtx();
+      const t = ctx.currentTime;
+      const len = Math.floor(ctx.sampleRate * 0.11);
+      const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let j = 0; j < len; j++)
+        d[j] = (Math.random() * 2 - 1) * Math.exp(-j / (ctx.sampleRate * 0.015));
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.62, t);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.11);
+      const filt = ctx.createBiquadFilter();
+      filt.type = 'lowpass';
+      filt.frequency.value = 1100;
+      src.connect(filt); filt.connect(gain); gain.connect(ctx.destination);
+      src.start(t);
+    }
+
+    // ══════════════════════════════════════════
+    //  THREE.JS — 3D Ruby Heart Dice
+    // ══════════════════════════════════════════
+    const canvas = document.getElementById('dice-canvas');
+
+    function getDiceSize() {
+      const vw = window.innerWidth, vh = window.innerHeight;
+      return Math.max(Math.min(vw * 0.52, vh * 0.4, 310), 185);
+    }
+
+    let SIZE = getDiceSize();
+    canvas.width = SIZE; canvas.height = SIZE;
+    canvas.style.width = SIZE + 'px'; canvas.style.height = SIZE + 'px';
+
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(SIZE, SIZE);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
+    camera.position.set(0, 0.12, 5.7);
+    camera.lookAt(0, 0, 0);
+
+    scene.add(new THREE.AmbientLight(0xfff0f0, 1.2));
+
+    const keyL = new THREE.DirectionalLight(0xffffff, 2.8);
+    keyL.position.set(3, 5, 4);
+    keyL.castShadow = true;
+    scene.add(keyL);
+
+    const fillL = new THREE.DirectionalLight(0xffe0e0, 1.4);
+    fillL.position.set(-3, 1.5, 3);
+    scene.add(fillL);
+
+    const rimL = new THREE.DirectionalLight(0xff7080, 0.7);
+    rimL.position.set(0, -3, -2);
+    scene.add(rimL);
+
+    const ptL = new THREE.PointLight(0xff2035, 2.0, 14);
+    ptL.position.set(1.5, 2.5, 3);
+    scene.add(ptL);
+
+    const ptL2 = new THREE.PointLight(0xffa0a0, 1.0, 10);
+    ptL2.position.set(-2, -1, 2);
+    scene.add(ptL2);
+
+    // ── Face texture generator ──
+    function makeHeartFace(count) {
+      const S = 512;
+      const cv = document.createElement('canvas');
+      cv.width = S; cv.height = S;
+      const ctx = cv.getContext('2d');
+
+      // Rounded rect clip
+      function rr(x, y, w, h, r) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+        ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+        ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
+      }
+
+      ctx.save();
+      rr(10, 10, S - 20, S - 20, 60);
+      ctx.clip();
+
+      // Ruby gradient
+      const bg = ctx.createRadialGradient(S * 0.32, S * 0.27, 8, S * 0.5, S * 0.5, S * 0.79);
+      bg.addColorStop(0, '#DD1A30');
+      bg.addColorStop(0.32, '#C0152A');
+      bg.addColorStop(0.68, '#930E1E');
+      bg.addColorStop(1, '#6E0916');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, S, S);
+
+      // Top-left gloss specular
+      const g1 = ctx.createRadialGradient(S * 0.18, S * 0.13, 0, S * 0.26, S * 0.21, S * 0.34);
+      g1.addColorStop(0, 'rgba(255,255,255,0.6)');
+      g1.addColorStop(0.45, 'rgba(255,255,255,0.15)');
+      g1.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g1;
+      ctx.beginPath();
+      ctx.ellipse(S * 0.24, S * 0.19, S * 0.25, S * 0.16, -0.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Bottom-right warm refraction
+      const g2 = ctx.createRadialGradient(S * 0.78, S * 0.84, 0, S * 0.72, S * 0.78, S * 0.28);
+      g2.addColorStop(0, 'rgba(255,100,80,0.22)');
+      g2.addColorStop(1, 'rgba(255,100,80,0)');
+      ctx.fillStyle = g2;
+      ctx.fillRect(0, 0, S, S);
+
+      ctx.restore();
+
+      // Rim highlight
+      ctx.save();
+      rr(12, 12, S - 24, S - 24, 58);
+      ctx.strokeStyle = 'rgba(255,170,170,0.28)';
+      ctx.lineWidth = 5;
+      ctx.stroke();
+      ctx.restore();
+
+      // Draw hearts
+      heartPositions(count, S).forEach(([hx, hy, hs]) => drawHeart(ctx, hx, hy, hs));
+
+      return new THREE.CanvasTexture(cv);
+    }
+
+    function heartPositions(n, S) {
+      const C = S / 2, u = S * 0.202, s = S * 0.126;
+      const m = {
+        1: [[C, C, u * 1.2]],
+        2: [[C, C - u * 0.5, u * 0.98], [C, C + u * 0.5, u * 0.98]],
+        3: [[C - u * 0.56, C + u * 0.5, s * 1.36], [C, C - u * 0.42, s * 1.36], [C + u * 0.56, C + u * 0.5, s * 1.36]],
+        4: [[C - u * 0.5, C - u * 0.5, s * 1.3], [C + u * 0.5, C - u * 0.5, s * 1.3], [C - u * 0.5, C + u * 0.5, s * 1.3], [C + u * 0.5, C + u * 0.5, s * 1.3]],
+        5: [[C - u * 0.5, C - u * 0.5, s * 1.24], [C + u * 0.5, C - u * 0.5, s * 1.24], [C, C, s * 1.24], [C - u * 0.5, C + u * 0.5, s * 1.24], [C + u * 0.5, C + u * 0.5, s * 1.24]],
+        6: [[C - u * 0.5, C - u * 0.58, s * 1.18], [C + u * 0.5, C - u * 0.58, s * 1.18], [C - u * 0.5, C, s * 1.18], [C + u * 0.5, C, s * 1.18], [C - u * 0.5, C + u * 0.58, s * 1.18], [C + u * 0.5, C + u * 0.58, s * 1.18]]
+      };
+      return m[n] || [];
+    }
+
+    function drawHeart(ctx, x, y, s) {
+      ctx.save();
+      ctx.translate(x, y);
+
+      ctx.shadowColor = 'rgba(70,0,8,0.52)';
+      ctx.shadowBlur = s * 0.28;
+      ctx.shadowOffsetX = s * 0.05;
+      ctx.shadowOffsetY = s * 0.09;
+
+      ctx.beginPath();
+      ctx.moveTo(0, -s * 0.17);
+      ctx.bezierCurveTo(-s * 0.5, -s * 0.7, -s * 1.02, -s * 0.1, 0, s * 0.6);
+      ctx.bezierCurveTo(s * 1.02, -s * 0.1, s * 0.5, -s * 0.7, 0, -s * 0.17);
+      ctx.closePath();
+
+      const hg = ctx.createRadialGradient(-s * 0.07, -s * 0.2, 0, 0, 0.1, s * 0.84);
+      hg.addColorStop(0, '#FFFEFA');
+      hg.addColorStop(0.4, '#F7EFE7');
+      hg.addColorStop(1, '#EADDD2');
+      ctx.fillStyle = hg;
+      ctx.fill();
+
+      ctx.shadowColor = 'transparent';
+      ctx.save();
+      ctx.clip();
+      const ig = ctx.createRadialGradient(-s * 0.18, -s * 0.28, 0, -s * 0.1, -s * 0.18, s * 0.46);
+      ig.addColorStop(0, 'rgba(255,255,255,0.75)');
+      ig.addColorStop(0.55, 'rgba(255,255,255,0.12)');
+      ig.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = ig;
+      ctx.fill();
+      ctx.restore();
+
+      ctx.restore();
+    }
+
+    // ── Dice Mesh ──
+    // BoxGeometry face order: +X, -X, +Y, -Y, +Z, -Z
+    // Standard dice opposite faces sum to 7: 1↔6, 2↔5, 3↔4
+    // Assignment: +Z=3, -Z=4, +X=2, -X=5, +Y=1, -Y=6
+    const faceValues = [2, 5, 1, 6, 3, 4];
+
+    const materials = faceValues.map(n =>
+      new THREE.MeshPhysicalMaterial({
+        map: makeHeartFace(n),
+        color: 0xCC1828,
+        metalness: 0.1,
+        roughness: 0.12,
+        transparent: false,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.06,
+        reflectivity: 0.9,
+      })
+    );
+
+    const geo = new THREE.BoxGeometry(1.74, 1.74, 1.74);
+    const dice = new THREE.Mesh(geo, materials);
+    scene.add(dice);
+
+    // Simple cube-map env for reflections (works in r128)
+    const cubeRenderTarget = new THREE.WebGLCubeRenderTarget(128);
+    const cubeCamera = new THREE.CubeCamera(0.1, 100, cubeRenderTarget);
+    scene.add(cubeCamera);
+    // Use a warm tinted env color instead of RoomEnvironment (not in r128)
+    scene.background = null;
+    materials.forEach(m => {
+      m.envMap = cubeRenderTarget.texture;
+      m.envMapIntensity = 0.6;
+    });
+
+    // ── Face rotation targets ──
+    // To show face V toward camera (+Z), rotate so that face normal aligns with +Z:
+    // +Z face (val=3): rot (0,0)
+    // -Z face (val=4): rot (0, PI)
+    // +X face (val=2): rot (0, -PI/2)
+    // -X face (val=5): rot (0, PI/2)
+    // +Y face (val=1): rot (PI/2, 0)  — +Y rotated to +Z
+    // -Y face (val=6): rot (-PI/2, 0) — -Y rotated to +Z
+    const landRot = {
+      1: { x: Math.PI / 2, y: 0 },
+      2: { x: 0, y: -Math.PI / 2 },
+      3: { x: 0, y: 0 },
+      4: { x: 0, y: Math.PI },
+      5: { x: 0, y: Math.PI / 2 },
+      6: { x: -Math.PI / 2, y: 0 },
+    };
+
+    // ── State ──
+    let isRolling = false;
+    let idleT = 0;
+    let currentVal = 3;
+    let mouseX = 0, mouseY = 0;
+    let smX = 0, smY = 0;
+
+    dice.rotation.set(0, 0, 0); // show face 3 by default
+
+    // ── Idle Animation ──
+    function idleUpdate(dt) {
+      if (isRolling) return;
+      idleT += dt;
+
+      dice.position.y = Math.sin(idleT * 1.08) * 0.072;
+
+      smX += (mouseX * 0.17 - smX) * 0.065;
+      smY += (mouseY * 0.17 - smY) * 0.065;
+
+      const base = landRot[currentVal];
+      dice.rotation.x = base.x + smY + Math.sin(idleT * 0.63) * 0.011;
+      dice.rotation.y = base.y + smX + Math.sin(idleT * 0.87 + 1.2) * 0.011;
+      dice.rotation.z = Math.sin(idleT * 0.48) * 0.007;
+    }
+
+    // ── Roll ──
+    function rollDice() {
+      if (isRolling) return;
+      unlockAudio();
+      isRolling = true;
+
+      const result = Math.floor(Math.random() * 6) + 1;
+      currentVal = result;
+
+      document.getElementById('rollBtn').disabled = true;
+      document.getElementById('resultText').classList.remove('visible');
+      document.getElementById('resultHearts').textContent = '';
+
+      playRollingSound();
+
+      const dur = 1200 + Math.random() * 320;
+      const t0 = performance.now();
+      const target = landRot[result];
+
+      // Large random spin amounts
+      const PI = Math.PI;
+      const sX = (Math.random() * 5 + 4) * PI * (Math.random() > 0.5 ? 1 : -1);
+      const sY = (Math.random() * 5 + 4) * PI * (Math.random() > 0.5 ? 1 : -1);
+      const sZ = (Math.random() * 1.4 + 0.7) * PI * (Math.random() > 0.5 ? 1 : -1);
+
+      const r0 = { x: dice.rotation.x, y: dice.rotation.y, z: dice.rotation.z };
+
+      // Easing: sharp deceleration
+      function ease(t) { return 1 - Math.pow(1 - t, 3.6); }
+
+      // Bounce: lift then settle
+      function bounce(t) {
+        if (t < 0.26) return -Math.sin(t / 0.26 * PI) * 0.44;
+        if (t < 0.74) return 0;
+        const b = (t - 0.74) / 0.26;
+        return Math.sin(b * PI) * 0.075 * (1 - b * 0.7);
+      }
+
+      function frame(now) {
+        const p = Math.min((now - t0) / dur, 1);
+        const e = ease(p);
+        const decay = Math.pow(1 - e, 0.45);
+
+        dice.rotation.x = r0.x + sX * e * decay + target.x * e * (1 - decay);
+        dice.rotation.y = r0.y + sY * e * decay + target.y * e * (1 - decay);
+        dice.rotation.z = r0.z + sZ * e * decay;
+        dice.position.y = bounce(p);
+
+        if (p < 1) {
+          requestAnimationFrame(frame);
+        } else {
+          dice.rotation.x = target.x;
+          dice.rotation.y = target.y;
+          dice.rotation.z = 0;
+          dice.position.y = 0;
+          onLanded(result);
+        }
+      }
+
+      requestAnimationFrame(frame);
+    }
+
+    function onLanded(n) {
+      isRolling = false;
+      idleT = 0;
+      playLandSound();
+
+      const w = document.getElementById('diceWrapper');
+      w.classList.add('landed');
+      setTimeout(() => w.classList.remove('landed'), 1000);
+
+      if (n === 6) spawnConfetti();
+
+      setTimeout(() => {
+        document.getElementById('resultHearts').textContent = '♡'.repeat(n);
+        const rt = document.getElementById('resultText');
+        rt.innerHTML = 'YOU ROLLED A <span class="num">' + n + '</span>';
+        rt.classList.add('visible');
+        document.getElementById('rollBtn').disabled = false;
+      }, 140);
+    }
+
+    // ── Confetti (on 6) ──
+    function spawnConfetti() {
+      const wr = document.getElementById('diceWrapper').getBoundingClientRect();
+      const cx = wr.left + wr.width / 2;
+      const cy = wr.top + wr.height / 2;
+
+      for (let i = 0; i < 16; i++) {
+        const el = document.createElement('div');
+        el.className = 'heart-confetti';
+        el.textContent = '♡';
+        const ang = (i / 16) * Math.PI * 2 + (Math.random() - 0.5) * 0.6;
+        const dist = 65 + Math.random() * 130;
+        const tx = Math.cos(ang) * dist;
+        const ty = Math.sin(ang) * dist - 40 - Math.random() * 35;
+        const rot = (Math.random() - 0.5) * 300;
+        const alpha = 0.42 + Math.random() * 0.45;
+        const fs = 0.72 + Math.random() * 0.72;
+        el.style.cssText = `left:${cx}px;top:${cy}px;--tx:${tx}px;--ty:${ty}px;--rot:${rot}deg;color:rgba(192,21,42,${alpha});font-size:${fs}rem;animation-delay:${Math.random() * 0.1}s;`;
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 1700);
+      }
+    }
+
+    // ── Render loop ──
+    let lastT = performance.now();
+    (function loop() {
+      const now = performance.now();
+      idleUpdate((now - lastT) / 1000);
+      lastT = now;
+      // Update cube camera for env reflections
+      dice.visible = false;
+      cubeCamera.update(renderer, scene);
+      dice.visible = true;
+      renderer.render(scene, camera);
+      requestAnimationFrame(loop);
+    })();
+
+    // ── Events ──
+    const diceWrapper = document.getElementById('diceWrapper');
+
+    window.addEventListener('mousemove', e => {
+      if (isRolling) return;
+      const r = diceWrapper.getBoundingClientRect();
+      mouseX = (e.clientX - (r.left + r.width / 2)) / (r.width / 2);
+      mouseY = (e.clientY - (r.top + r.height / 2)) / (r.height / 2);
+    });
+
+    diceWrapper.addEventListener('mouseleave', () => { mouseX = 0; mouseY = 0; });
+    diceWrapper.addEventListener('click', rollDice);
+    document.getElementById('rollBtn').addEventListener('click', rollDice);
+
+    window.addEventListener('keydown', e => {
+      if (e.code === 'Space' && !e.repeat) { e.preventDefault(); rollDice(); }
+    });
+
+    document.getElementById('soundBtn').addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      document.getElementById('soundIconOn').style.display = soundEnabled ? 'block' : 'none';
+      document.getElementById('soundIconOff').style.display = soundEnabled ? 'none' : 'block';
+    });
+
+    document.addEventListener('pointerdown', unlockAudio, { once: true });
+
+    window.addEventListener('resize', () => {
+      SIZE = getDiceSize();
+      canvas.width = SIZE; canvas.height = SIZE;
+      canvas.style.width = SIZE + 'px'; canvas.style.height = SIZE + 'px';
+      renderer.setSize(SIZE, SIZE);
+      camera.updateProjectionMatrix();
+    });
+  </script>
+</body>
+
+</html>
